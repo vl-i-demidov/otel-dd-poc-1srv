@@ -1,0 +1,49 @@
+version: '3.4'
+
+services:
+
+  otel-dd-poc-1srv:
+    image: otel-dd-poc-1srv
+    labels:
+      com.datadoghq.tags.env: "qa"
+      com.datadoghq.tags.service: "otel-dd-poc-1srv"
+      com.datadoghq.tags.version: "0.0.1"
+    build:
+      context: .
+    container_name: otel-dd-poc-1srv
+    environment:
+      - DD_ENV=qa
+      - DD_SERVICE=otel-dd-poc-1srv
+      - DD_VERSION=0.0.1
+      - DD_AGENT_HOST=datadog-agent
+      - DD_TRACE_AGENT_PORT=8126
+      # OTLP ingestion
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://datadog-agent:4317
+    ports:
+      - 8080:8080
+    depends_on:
+      - datadog-agent
+
+  datadog-agent:
+    image: datadog/agent:latest
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      # OTLP ingestion
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317
+      # misc
+      - DD_LOG_LEVEL=debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8126/info"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+    ports:
+      - "5003:5003"
+      - "8126:8126"
+      - "4317:4317"
