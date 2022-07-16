@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/gorilla/mux"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -11,7 +12,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc"
-	muxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/gorilla/mux"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 	"log"
@@ -30,20 +30,20 @@ func main() {
 	defer stopProfiler()
 
 	// Create a traced mux router.
-	mux := muxtrace.NewRouter()
+	router := mux.NewRouter()
 
-	mux.Use(
+	router.Use(
 		otelmux.Middleware(os.Getenv("DD_SERVICE"), otelmux.WithTracerProvider(otel.GetTracerProvider())),
 	)
 
 	// Continue using the router as you normally would.
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		sleep, _ := strconv.Atoi(r.URL.Query().Get("sleep"))
 		loadCPU(sleep)
 		w.Write([]byte("Hello World!"))
 	})
-	http.ListenAndServe(":8080", mux)
+	http.ListenAndServe(":8080", router)
 }
 
 func setUpOtelTracing() (stop func()) {
@@ -84,8 +84,7 @@ func setUpOtelTracing() (stop func()) {
 		tracesdk.WithResource(res),
 	)
 
-	// set global propagator to tracecontext (the default is no-op).
-	// is it necessary???
+	// set global propagator to tracecontext
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 	// set global trace provider
 	otel.SetTracerProvider(tracerProvider)
